@@ -43,7 +43,7 @@ export const defaultVdaData: VdaData = {
   footerRight: "Warenanhänger VDA 4902, Version 4",
 };
 
-function Barcode({ value, height = 50 }: { value: string; height?: number }) {
+function Barcode({ value, height = 36 }: { value: string; height?: number }) {
   const ref = useRef<SVGSVGElement>(null);
   useEffect(() => {
     if (ref.current && value) {

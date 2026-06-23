@@ -183,9 +183,11 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 4px;
   min-height: 0;
 }
+.vda-cell-content > svg { flex-shrink: 0; }
 .vda-value-md { font-size: 14px; font-weight: 700; }
 .vda-value-lg { font-size: 18px; font-weight: 700; line-height: 1.15; }
 .vda-value-xl { font-size: 26px; font-weight: 700; line-height: 1.1; }
