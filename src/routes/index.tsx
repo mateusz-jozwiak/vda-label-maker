@@ -31,8 +31,6 @@ const fields: { key: keyof VdaData; label: string; textarea?: boolean }[] = [
   { key: "engineeringChange", label: "(14) Änderungsstand" },
   { key: "packageNo", label: "(15) Packstück-Nr." },
   { key: "batchNo", label: "(16) Chargen-Nr." },
-  { key: "footerLeft", label: "(17) Stopka - lewa" },
-  { key: "footerRight", label: "Stopka - prawa" },
 ];
 
 function Index() {
@@ -46,7 +44,18 @@ function Index() {
     if (!labelRef.current) return;
     setExporting(true);
     try {
-      const canvas = await html2canvas(labelRef.current, { scale: 3, backgroundColor: "#ffffff" });
+      const canvas = await html2canvas(labelRef.current, {
+        scale: 3,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+        onclone: (doc) => {
+          // Neutralize oklch() values (Tailwind v4) that html2canvas cannot parse
+          doc.querySelectorAll<HTMLElement>("*").forEach((el) => {
+            el.style.borderColor = el.style.borderColor || "#000";
+          });
+        },
+      });
       const img = canvas.toDataURL("image/png");
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a5" });
       const pw = pdf.internal.pageSize.getWidth();
@@ -59,6 +68,9 @@ function Index() {
       if (h > ah) { h = ah; w = ah * ratio; }
       pdf.addImage(img, "PNG", (pw - w) / 2, (ph - h) / 2, w, h);
       pdf.save("etykieta-vda-4902.pdf");
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      alert("Eksport PDF nie powiódł się: " + (err as Error).message);
     } finally {
       setExporting(false);
     }
