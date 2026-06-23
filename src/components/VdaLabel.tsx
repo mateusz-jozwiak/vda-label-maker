@@ -153,11 +153,8 @@ export const VdaLabel = forwardRef<HTMLDivElement, { data: VdaData }>(
           </Cell>
           <Cell label="(16) Chargen-Nr. (H)" className="col-span-7">
             <div className="vda-value-lg text-center">{data.batchNo}</div>
+            <Barcode value={data.batchNo.replace(/\s/g, "")} />
           </Cell>
-
-          {/* Footer */}
-          <div className="col-span-5 vda-footer">{data.footerLeft}</div>
-          <div className="col-span-7 vda-footer">{data.footerRight}</div>
         </div>
       </div>
     );
