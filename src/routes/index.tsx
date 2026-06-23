@@ -50,10 +50,9 @@ function Index() {
         useCORS: true,
         logging: false,
         onclone: (doc) => {
-          // Neutralize oklch() values (Tailwind v4) that html2canvas cannot parse
-          doc.querySelectorAll<HTMLElement>("*").forEach((el) => {
-            el.style.borderColor = el.style.borderColor || "#000";
-          });
+          const style = doc.createElement("style");
+          style.textContent = `* { border-color: #000 !important; color: #000; background-color: transparent; } .vda-label-root, .vda-label-root * { color: #000 !important; } .vda-label-root { background:#fff !important; }`;
+          doc.head.appendChild(style);
         },
       });
       const img = canvas.toDataURL("image/png");
