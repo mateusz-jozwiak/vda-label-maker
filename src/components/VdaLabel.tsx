@@ -60,7 +60,11 @@ function Barcode({ value, height = 36 }: { value: string; height?: number }) {
       }
     }
   }, [value, height]);
-  return <svg ref={ref} className="w-full" style={{ height }} />;
+  return (
+    <div className="flex justify-center">
+      <svg ref={ref} style={{ height, maxWidth: "100%" }} />
+    </div>
+  );
 }
 
 function Cell({
