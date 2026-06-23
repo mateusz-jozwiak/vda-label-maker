@@ -60,7 +60,11 @@ function Barcode({ value, height = 36 }: { value: string; height?: number }) {
       }
     }
   }, [value, height]);
-  return <svg ref={ref} className="w-full" style={{ height }} />;
+  return (
+    <div className="flex justify-center">
+      <svg ref={ref} style={{ height, maxWidth: "100%" }} />
+    </div>
+  );
 }
 
 function Cell({
@@ -135,7 +139,7 @@ export const VdaLabel = forwardRef<HTMLDivElement, { data: VdaData }>(
               <div className="vda-value-lg text-center">{data.description}</div>
             </Cell>
             <Cell label="(11) Sach-Nr. Lieferant (30S)" className="col-span-12">
-              <div className="vda-value-lg text-right">{data.partNoSupplier}</div>
+              <div className="vda-value-lg text-center">{data.partNoSupplier}</div>
               <Barcode value={data.partNoSupplier.replace(/\s/g, "")} />
             </Cell>
             <Cell label="(13) Datum" className="col-span-6">
