@@ -3,6 +3,13 @@ import { useEffect, useRef, useState } from "react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   VdaLabel,
   defaultVdaData,
   defaultPrefixes,
@@ -74,50 +81,107 @@ function loadPrefixes(): VdaPrefixes {
   }
 }
 
+function uniqueName(base: string, existing: Preset[]): string {
+  const names = new Set(existing.map((p) => p.name));
+  if (!names.has(base)) return base;
+  let i = 2;
+  while (names.has(`${base} (${i})`)) i++;
+  return `${base} (${i})`;
+}
+
 function Index() {
   const [data, setData] = useState<VdaData>(defaultVdaData);
   const [prefixes, setPrefixes] = useState<VdaPrefixes>(defaultPrefixes);
   const [presets, setPresets] = useState<Preset[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const labelRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setPrefixes(loadPrefixes());
     setPresets(loadPresets());
   }, []);
 
+  const persistPresets = (next: Preset[]) => {
+    setPresets(next);
+    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(next)); } catch {}
+  };
+  const persistPrefixes = (next: VdaPrefixes) => {
+    setPrefixes(next);
+    try { localStorage.setItem(PREFIXES_KEY, JSON.stringify(next)); } catch {}
+  };
+
   const update = (k: keyof VdaData, v: string) => setData((d) => ({ ...d, [k]: v }));
-  const updatePrefix = (k: PrefixKey, v: string) => {
-    setPrefixes((p) => {
-      const next = { ...p, [k]: v.toUpperCase().replace(/\s/g, "") };
-      try { localStorage.setItem(PREFIXES_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
-  };
-  const resetPrefixes = () => {
-    setPrefixes(defaultPrefixes);
-    try { localStorage.setItem(PREFIXES_KEY, JSON.stringify(defaultPrefixes)); } catch {}
-  };
+  const updatePrefix = (k: PrefixKey, v: string) =>
+    persistPrefixes({ ...prefixes, [k]: v.toUpperCase().replace(/\s/g, "") });
+  const resetPrefixes = () => persistPrefixes(defaultPrefixes);
 
   const savePreset = () => {
     const name = prompt("Nazwa presetu:");
     if (!name) return;
-    const next = [...presets.filter((p) => p.name !== name), { name, data, prefixes }];
-    setPresets(next);
-    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(next)); } catch {}
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const next = [...presets.filter((p) => p.name !== trimmed), { name: trimmed, data, prefixes }];
+    persistPresets(next);
   };
   const loadPreset = (name: string) => {
     const p = presets.find((x) => x.name === name);
     if (!p) return;
     setData(p.data);
     setPrefixes(p.prefixes);
+    try { localStorage.setItem(PREFIXES_KEY, JSON.stringify(p.prefixes)); } catch {}
   };
   const deletePreset = (name: string) => {
     if (!confirm(`Usunąć preset "${name}"?`)) return;
-    const next = presets.filter((p) => p.name !== name);
-    setPresets(next);
-    try { localStorage.setItem(PRESETS_KEY, JSON.stringify(next)); } catch {}
+    persistPresets(presets.filter((p) => p.name !== name));
+  };
+  const duplicatePreset = (name: string) => {
+    const p = presets.find((x) => x.name === name);
+    if (!p) return;
+    const newName = uniqueName(`${p.name} (kopia)`, presets);
+    persistPresets([...presets, { name: newName, data: p.data, prefixes: p.prefixes }]);
+  };
+  const renamePreset = (name: string) => {
+    const next = prompt("Nowa nazwa presetu:", name);
+    if (!next) return;
+    const trimmed = next.trim();
+    if (!trimmed || trimmed === name) return;
+    if (presets.some((p) => p.name === trimmed)) {
+      alert("Preset o takiej nazwie już istnieje.");
+      return;
+    }
+    persistPresets(presets.map((p) => (p.name === name ? { ...p, name: trimmed } : p)));
+  };
+
+  const exportPresets = () => {
+    const blob = new Blob([JSON.stringify(presets, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `vda-presety-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+  const importPresets = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) throw new Error("Plik nie zawiera tablicy presetów.");
+      const valid = parsed.filter(
+        (p: any) => p && typeof p.name === "string" && p.data && p.prefixes,
+      ) as Preset[];
+      if (!valid.length) throw new Error("Brak prawidłowych presetów w pliku.");
+      const merged = [...presets];
+      for (const p of valid) {
+        const name = uniqueName(p.name, merged);
+        merged.push({ name, data: { ...defaultVdaData, ...p.data }, prefixes: { ...defaultPrefixes, ...p.prefixes } });
+      }
+      persistPresets(merged);
+      alert(`Zaimportowano ${valid.length} preset(ów).`);
+    } catch (err) {
+      alert("Import nie powiódł się: " + (err as Error).message);
+    }
   };
 
   const exportPdf = async () => {
@@ -177,8 +241,8 @@ function Index() {
             <button onClick={savePreset} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
               Zapisz preset
             </button>
-            <button onClick={() => setShowSettings((s) => !s)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
-              {showSettings ? "Ukryj ustawienia" : "Ustawienia prefiksów"}
+            <button onClick={() => setSettingsOpen(true)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+              Ustawienia
             </button>
             <button
               onClick={exportPdf}
@@ -193,49 +257,6 @@ function Index() {
 
       <main className="mx-auto max-w-[1600px] grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6 p-6">
         <aside className="bg-background rounded-lg border p-4 h-fit lg:sticky lg:top-6 max-h-[calc(100vh-3rem)] overflow-auto">
-          {showSettings && (
-            <div className="mb-4 pb-4 border-b">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="font-semibold">Prefiksy kodów kreskowych</h2>
-                <button onClick={resetPrefixes} className="text-xs underline text-muted-foreground">
-                  Reset
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground mb-3">
-                Prefiks (np. P, Q, 30S) dodawany na początek kodu Code39. Jeśli wpiszesz go w wartości pola — zostanie automatycznie usunięty, żeby się nie dublował.
-              </p>
-              <div className="space-y-2">
-                {(Object.keys(prefixFieldLabels) as PrefixKey[]).map((k) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <label className="text-xs flex-1">{prefixFieldLabels[k]}</label>
-                    <input
-                      value={prefixes[k]}
-                      onChange={(e) => updatePrefix(k, e.target.value)}
-                      className="w-20 rounded border border-input bg-background px-2 py-1 text-sm font-mono"
-                    />
-                  </div>
-                ))}
-              </div>
-              {presets.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-xs font-semibold text-muted-foreground mb-2">Zapisane presety</h3>
-                  <ul className="space-y-1">
-                    {presets.map((p) => (
-                      <li key={p.name} className="flex items-center justify-between text-sm">
-                        <button onClick={() => loadPreset(p.name)} className="underline text-left flex-1 truncate">
-                          {p.name}
-                        </button>
-                        <button onClick={() => deletePreset(p.name)} className="text-xs text-destructive ml-2">
-                          Usuń
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
           <h2 className="font-semibold mb-3">Dane etykiety</h2>
           <div className="space-y-3">
             {fields.map((f) => (
@@ -273,6 +294,98 @@ function Index() {
           </div>
         </section>
       </main>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>Ustawienia</DialogTitle>
+            <DialogDescription>
+              Zarządzaj prefiksami kodów kreskowych i presetami zapisanymi w przeglądarce.
+            </DialogDescription>
+          </DialogHeader>
+
+          <section className="mt-2">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-sm">Prefiksy kodów kreskowych</h3>
+              <button onClick={resetPrefixes} className="text-xs underline text-muted-foreground">
+                Reset
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground mb-3">
+              Prefiks (np. P, Q, 30S) dodawany na początek kodu Code39. Jeśli wpiszesz go w wartości pola — zostanie automatycznie usunięty, żeby się nie dublował.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {(Object.keys(prefixFieldLabels) as PrefixKey[]).map((k) => (
+                <div key={k} className="flex items-center gap-2">
+                  <label className="text-xs flex-1">{prefixFieldLabels[k]}</label>
+                  <input
+                    value={prefixes[k]}
+                    onChange={(e) => updatePrefix(k, e.target.value)}
+                    className="w-20 rounded border border-input bg-background px-2 py-1 text-sm font-mono"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="mt-6 border-t pt-4">
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <h3 className="font-semibold text-sm">Presety ({presets.length})</h3>
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={exportPresets}
+                  disabled={!presets.length}
+                  className="text-xs rounded border px-2 py-1 hover:bg-muted disabled:opacity-50"
+                >
+                  Eksportuj JSON
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-xs rounded border px-2 py-1 hover:bg-muted"
+                >
+                  Importuj JSON
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) importPresets(f);
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+            </div>
+            {presets.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Brak zapisanych presetów. Użyj „Zapisz preset" w nagłówku.</p>
+            ) : (
+              <ul className="space-y-1">
+                {presets.map((p) => (
+                  <li key={p.name} className="flex items-center justify-between gap-2 text-sm border rounded px-2 py-1.5">
+                    <span className="truncate flex-1" title={p.name}>{p.name}</span>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => loadPreset(p.name)} className="text-xs rounded border px-2 py-0.5 hover:bg-muted">
+                        Wczytaj
+                      </button>
+                      <button onClick={() => duplicatePreset(p.name)} className="text-xs rounded border px-2 py-0.5 hover:bg-muted">
+                        Duplikuj
+                      </button>
+                      <button onClick={() => renamePreset(p.name)} className="text-xs rounded border px-2 py-0.5 hover:bg-muted">
+                        Zmień nazwę
+                      </button>
+                      <button onClick={() => deletePreset(p.name)} className="text-xs rounded border px-2 py-0.5 text-destructive hover:bg-destructive/10">
+                        Usuń
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
