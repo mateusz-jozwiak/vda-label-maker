@@ -30,7 +30,7 @@ export const defaultVdaData: VdaData = {
   netWeight: "34 kg",
   grossWeight: "158 kg",
   packagesCount: "3",
-  partNoCustomer: "A 123 456 7890",
+  partNoCustomer: "123 456 7890",
   quantity: "1 000 St.",
   description: "Elektr. Steuergerät",
   partNoSupplier: "987654321 B",
@@ -100,7 +100,7 @@ export const VdaLabel = forwardRef<HTMLDivElement, { data: VdaData }>(
           {/* Row 2 */}
           <Cell label="(3) Lieferschein-Nr. (N)" className="col-span-7">
             <div className="vda-value-lg text-center">{data.deliveryNoteNo}</div>
-            <Barcode value={data.deliveryNoteNo} />
+            <Barcode value={`N${data.deliveryNoteNo.replace(/\s/g, "")}`} />
           </Cell>
           <div className="col-span-5 vda-subgrid">
             <Cell label="(4) Lieferantenanschrift (Kurzname, Werk, PLZ Ort)" className="col-span-12">
@@ -120,18 +120,18 @@ export const VdaLabel = forwardRef<HTMLDivElement, { data: VdaData }>(
           {/* Row 3 - full width */}
           <Cell label="(8) Sach-Nr. Kunde (P)" className="col-span-12">
             <div className="vda-value-xl text-center">{data.partNoCustomer}</div>
-            <Barcode value={data.partNoCustomer.replace(/\s/g, "")} height={60} />
+            <Barcode value={`P${data.partNoCustomer.replace(/\s/g, "")}`} height={60} />
           </Cell>
 
           {/* Row 4 */}
           <div className="col-span-5 vda-subgrid">
             <Cell label="(9) Füllmenge (Q)" className="col-span-12">
-              <div className="vda-value-lg">{data.quantity}</div>
-              <Barcode value={data.quantity.replace(/\s/g, "")} />
+              <div className="vda-value-lg text-center">{data.quantity}</div>
+              <Barcode value={`Q${data.quantity.replace(/\s/g, "")}`} />
             </Cell>
             <Cell label="(12) Lieferanten-Nr. (V)" className="col-span-12">
               <div className="vda-value-lg text-center">{data.supplierNo}</div>
-              <Barcode value={data.supplierNo.replace(/\s/g, "")} />
+              <Barcode value={`V${data.supplierNo.replace(/\s/g, "")}`} />
             </Cell>
           </div>
           <div className="col-span-7 vda-subgrid">
@@ -140,7 +140,7 @@ export const VdaLabel = forwardRef<HTMLDivElement, { data: VdaData }>(
             </Cell>
             <Cell label="(11) Sach-Nr. Lieferant (30S)" className="col-span-12">
               <div className="vda-value-lg text-center">{data.partNoSupplier}</div>
-              <Barcode value={data.partNoSupplier.replace(/\s/g, "")} />
+              <Barcode value={`30S${data.partNoSupplier.replace(/\s/g, "")}`} />
             </Cell>
             <Cell label="(13) Datum" className="col-span-6">
               <div className="vda-value-md text-center">{data.date}</div>
@@ -153,11 +153,11 @@ export const VdaLabel = forwardRef<HTMLDivElement, { data: VdaData }>(
           {/* Row 5 */}
           <Cell label="(15) Packstück-Nr. (S)" className="col-span-5">
             <div className="vda-value-lg text-center">{data.packageNo}</div>
-            <Barcode value={data.packageNo.replace(/\s/g, "")} />
+            <Barcode value={`S${data.packageNo.replace(/\s/g, "")}`} />
           </Cell>
           <Cell label="(16) Chargen-Nr. (H)" className="col-span-7">
             <div className="vda-value-lg text-center">{data.batchNo}</div>
-            <Barcode value={data.batchNo.replace(/\s/g, "")} />
+            <Barcode value={`H${data.batchNo.replace(/\s/g, "")}`} />
           </Cell>
         </div>
       </div>
