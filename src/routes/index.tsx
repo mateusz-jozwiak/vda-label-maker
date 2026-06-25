@@ -347,6 +347,20 @@ function Index() {
             <button onClick={savePreset} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
               Zapisz preset
             </button>
+            <button onClick={() => ediInputRef.current?.click()} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+              Importuj EDI
+            </button>
+            <input
+              ref={ediInputRef}
+              type="file"
+              accept=".edi,.txt,text/plain"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importEdi(f);
+                e.target.value = "";
+              }}
+            />
             <button onClick={() => setSettingsOpen(true)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
               Ustawienia
             </button>
