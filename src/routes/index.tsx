@@ -186,6 +186,23 @@ function Index() {
   const [exporting, setExporting] = useState(false);
   const labelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ediInputRef = useRef<HTMLInputElement>(null);
+  const importEdi = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseEdi(text);
+      const count = Object.keys(parsed).length;
+      if (!count) {
+        alert("Nie znaleziono danych w pliku EDI.");
+        return;
+      }
+      setData((d) => ({ ...d, ...parsed }));
+      alert(`Zaimportowano ${count} pól z pliku EDI.`);
+    } catch (err) {
+      alert("Import EDI nie powiódł się: " + (err as Error).message);
+    }
+  };
+
 
   useEffect(() => {
     setPrefixes(loadPrefixes());
