@@ -89,6 +89,95 @@ function uniqueName(base: string, existing: Preset[]): string {
   return `${base} (${i})`;
 }
 
+/**
+ * Parse an EDIFACT DESADV message into partial VdaData.
+ * Segment terminator: '  Element sep: +  Component sep: :
+ */
+function parseEdi(text: string): Partial<VdaData> {
+  const clean = text.replace(/\r?\n/g, "").trim();
+  const segments = clean.split("'").map((s) => s.trim()).filter(Boolean);
+  const out: Partial<VdaData> = {};
+
+  const fmtDate = (raw: string): string =>
+    /^\d{8,}/.test(raw) ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}` : raw;
+
+  for (const seg of segments) {
+    const parts = seg.split("+");
+    const tag = parts[0];
+    const els = parts.slice(1).map((e) => e.split(":"));
+
+    switch (tag) {
+      case "BGM": {
+        const docNo = els[1]?.[0];
+        if (docNo) out.deliveryNoteNo = docNo;
+        break;
+      }
+      case "DTM": {
+        const [qual, val] = els[0] ?? [];
+        if ((qual === "11" || qual === "137") && val && !out.date) out.date = fmtDate(val);
+        break;
+      }
+      case "MEA": {
+        const qual = els[1]?.[0];
+        const value = els[2]?.[1];
+        if (value) {
+          const f = `${value} kg`;
+          if (qual === "G") out.grossWeight = f;
+          if (qual === "N") out.netWeight = f;
+        }
+        break;
+      }
+      case "NAD": {
+        const role = els[0]?.[0];
+        const id = els[1]?.[0];
+        const name = els[4]?.[0];
+        if (role === "CN" || role === "BY") {
+          if (name) out.recipient = name;
+        } else if (role === "SE" || role === "CZ") {
+          if (name) out.supplierAddress = name;
+          if (id && !out.supplierNo) out.supplierNo = id;
+        }
+        break;
+      }
+      case "LOC": {
+        if (els[0]?.[0] === "11" && els[1]?.[0]) out.unloadingPoint = els[1][0];
+        break;
+      }
+      case "QTY": {
+        const [qual, value] = els[0] ?? [];
+        if (qual === "12" && value) out.quantity = value;
+        break;
+      }
+      case "PAC": {
+        const count = els[0]?.[0];
+        if (count && !out.packagesCount) out.packagesCount = count;
+        break;
+      }
+      case "GIR": {
+        const pkg = els[2]?.[0];
+        if (pkg) out.packageNo = pkg;
+        break;
+      }
+      case "LIN": {
+        const part = els[2]?.[0];
+        const qual = els[2]?.[1];
+        if (part) {
+          if (qual === "IN") out.partNoCustomer = part;
+          else if (qual === "SA") out.partNoSupplier = part;
+        }
+        break;
+      }
+      case "RFF": {
+        const [qual, value] = els[0] ?? [];
+        if (qual === "DQ" && value) out.deliveryNoteNo = value;
+        else if ((qual === "ON" || qual === "AAK") && value && !out.deliveryNoteNo) out.deliveryNoteNo = value;
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 function Index() {
   const [data, setData] = useState<VdaData>(defaultVdaData);
   const [prefixes, setPrefixes] = useState<VdaPrefixes>(defaultPrefixes);
@@ -97,6 +186,23 @@ function Index() {
   const [exporting, setExporting] = useState(false);
   const labelRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ediInputRef = useRef<HTMLInputElement>(null);
+  const importEdi = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = parseEdi(text);
+      const count = Object.keys(parsed).length;
+      if (!count) {
+        alert("Nie znaleziono danych w pliku EDI.");
+        return;
+      }
+      setData((d) => ({ ...d, ...parsed }));
+      alert(`Zaimportowano ${count} pól z pliku EDI.`);
+    } catch (err) {
+      alert("Import EDI nie powiódł się: " + (err as Error).message);
+    }
+  };
+
 
   useEffect(() => {
     setPrefixes(loadPrefixes());
@@ -241,6 +347,20 @@ function Index() {
             <button onClick={savePreset} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
               Zapisz preset
             </button>
+            <button onClick={() => ediInputRef.current?.click()} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
+              Importuj EDI
+            </button>
+            <input
+              ref={ediInputRef}
+              type="file"
+              accept=".edi,.txt,text/plain"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importEdi(f);
+                e.target.value = "";
+              }}
+            />
             <button onClick={() => setSettingsOpen(true)} className="rounded-md border px-3 py-2 text-sm hover:bg-muted">
               Ustawienia
             </button>
